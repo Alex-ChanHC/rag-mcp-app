@@ -1,7 +1,7 @@
 # ingest.py
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai.embeddings import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings # Changed from OpenAIEmbeddings
 from langchain_chroma import Chroma
 from uuid import uuid4
 import os
@@ -21,8 +21,9 @@ if not os.path.exists(DATA_PATH) or not os.listdir(DATA_PATH):
     print("Please ensure you have copied your PDF files into the 'data' directory within 'rag-mcp-app'.")
     exit(1)
 
-# Initiate the embeddings model
-embeddings_model = OpenAIEmbeddings(model="text-embedding-3-large")
+# Initiate the embeddings model using Google Generative AI
+# Ensure your GOOGLE_API_KEY is set in your .env file
+embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001") # Changed to GoogleGenerativeAIEmbeddings
 
 # Ensure the chroma_db directory exists
 os.makedirs(CHROMA_PATH, exist_ok=True)

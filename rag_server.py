@@ -12,28 +12,25 @@ from rich.console import Console
 from rich.markdown import Markdown
 from typing import Optional, List, Dict, Any
 
-from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_community.llms import Ollama # Import Ollama for local models
 from langchain_chroma import Chroma
-from langchain_community.llms import Ollama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 import os
 
-# Load environment variables (e.g., for OpenAI API key)
+# Load environment variables (e.g., for GOOGLE_API_KEY)
 load_dotenv()
 
 # Configuration for RAG
 DATA_PATH = r"data" # Assuming data directory will be in the same root as rag_server.py
 CHROMA_PATH = r"chroma_db" # Directory to store the ChromaDB
 
-# Initialize embeddings model
-embeddings_model = OpenAIEmbeddings(model="text-embedding-3-large")
-
-# Initialize the LLM for RAG using Langchain's Ollama integration
-# This assumes Ollama is running and 'qwen3:1.7b' is available.
-rag_llm = Ollama(model="qwen3:1.7b", temperature=0.5)
+# Initialize embeddings model using Google Generative AI
+# Ensure your GOOGLE_API_KEY is set in your .env file
+embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # Initialize the vector store
 # Ensure the chroma_db directory is created and populated by ingest.py before running the server.
@@ -81,7 +78,7 @@ async def get_rag_response(query: str, history: List[Dict[str, str]]) -> str:
     Answers questions based on provided knowledge using RAG.
 
     This tool retrieves relevant information from a vector database and uses
-    an LLM (Qwen) to generate an answer based solely on that information.
+    an LLM (Gemini or Ollama) to generate an answer based solely on that information.
 
     Args:
         query (str): The user's question.
@@ -126,9 +123,26 @@ async def get_rag_response(query: str, history: List[Dict[str, str]]) -> str:
     answer = await rag_chain.ainvoke(query)
     return answer
 
-if __name__ == "__main__":
+# Main function to parse arguments and run the server
+async def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--llm-provider", default="ollama", choices=["ollama", "gemini"],
+                   help="Choose the LLM provider for RAG: 'ollama' (default) or 'gemini'.")
+    args = p.parse_args()
+
+    global rag_llm
+    if args.llm_provider == "gemini":
+        rag_llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.5)
+        print("Using Google Gemini for RAG LLM.")
+    else: # Default to ollama
+        rag_llm = Ollama(model="qwen3:1.7b", temperature=0.5)
+        print("Using Ollama (qwen3:1.7b) for RAG LLM.")
+
     # Initialize and run the server.
     # 'transport='stdio'' means the server will communicate via standard input/output,
     # which is how the MCP client connects to it.
     # FastMCP handles running async tools when the tool function is defined as async.
     mcp_server.run(transport='stdio')
+
+if __name__ == "__main__":
+    asyncio.run(main())

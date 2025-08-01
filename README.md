@@ -19,11 +19,15 @@ This project combines a Retrieval-Augmented Generation (RAG) system with the Mod
 
 *   **Python 3.11+**: Ensure you have Python installed.
 *   **Ollama**: Install Ollama from [ollama.ai](https://ollama.ai/) and ensure it's running.
-*   **Ollama Model**: Pull the `qwen3:1.7b` model:
+*   **Ollama Model (`qwen3:1.7b`)**: Pull the `qwen3:1.7b` model for the client's orchestrator LLM:
     ```bash
     ollama pull qwen3:1.7b
     ```
-*   **OpenAI API Key**: Set your OpenAI API key as an environment variable (e.g., in a `.env` file). The RAG system uses OpenAI for embeddings and potentially for the LLM if not using Ollama for RAG.
+*   **Ollama Embedding Model (`nomic-embed-text`)**: If you plan to use Ollama for embeddings (though Gemini is default), pull this model:
+    ```bash
+    ollama pull nomic-embed-text
+    ```
+*   **Google API Key**: Set your `GOOGLE_API_KEY` as an environment variable (e.g., in a `.env` file). This is required for Google Gemini embeddings and the Gemini LLM.
 
 ### Installation
 
@@ -45,12 +49,17 @@ This project combines a Retrieval-Augmented Generation (RAG) system with the Mod
 
 3.  **Install Dependencies:**
     ```bash
-    pip install -r requirements.txt
+    uv pip install -r requirements.txt
     ```
 
 ### Data Preparation
 
 1.  **Populate the `data/` directory**: Place your PDF documents into the `rag-mcp-app/data/` directory.
+
+2.  **Run the Ingestion Script**: This needs to be run *before* you start the RAG server for the first time, or whenever you add new documents to the `data/` directory.
+    ```bash
+    python ingest.py
+    ```
 
 ### Running the Application
 
@@ -60,7 +69,9 @@ You will need to run two processes: the MCP server and the client UI.
 
 Open a new terminal, activate your virtual environment, and run:
 ```bash
-python rag_server.py
+python rag_server.py --llm-provider ollama
+# Or to use Gemini for RAG LLM:
+# python rag_server.py --llm-provider gemini
 ```
 This will start the MCP server, making the `get_weather` and `get_rag_response` tools available.
 
@@ -78,9 +89,3 @@ The client UI will launch in your browser. You can then interact with the chatbo
 
 *   **Ask a question about your documents:** "What is the main topic of the documents?"
 *   **Ask about the weather:** "What's the weather like in London?"
-
----
-**Note:** The `ingest.py` script needs to be run *before* you start the RAG server for the first time, or whenever you add new documents to the `data/` directory.
-```bash
-# Run this in a separate terminal before starting the server/client if you have new data
-python ingest.py
