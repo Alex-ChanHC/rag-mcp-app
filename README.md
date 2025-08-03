@@ -10,6 +10,7 @@ This project combines a Retrieval-Augmented Generation (RAG) system with the Mod
     - `rag_server.py`: The MCP server that hosts the RAG and weather tools.
     - `client_ui.py`: The client application with a Gradio UI that orchestrates LLM calls and tool usage.
     - `ingest.py`: A script to load and index your PDF documents into the vector database.
+    - `.env.example`: An example configuration file. Copy this to `.env` to configure the application.
     - `requirements.txt`: Lists all project dependencies.
     - `README.md`: This file.
 
@@ -19,15 +20,11 @@ This project combines a Retrieval-Augmented Generation (RAG) system with the Mod
 
 *   **Python 3.11+**: Ensure you have Python installed.
 *   **Ollama**: Install Ollama from [ollama.ai](https://ollama.ai/) and ensure it's running.
-*   **Ollama Model (`qwen3:1.7b`)**: Pull the `qwen3:1.7b` model for the client's orchestrator LLM:
+*   **Ollama Models**: Pull the necessary models for the client's orchestrator LLM and the RAG LLM (if using Ollama). The defaults are `qwen3:1.7b`.
     ```bash
     ollama pull qwen3:1.7b
     ```
-*   **Ollama Embedding Model (`nomic-embed-text`)**: If you plan to use Ollama for embeddings (though Gemini is default), pull this model:
-    ```bash
-    ollama pull nomic-embed-text
-    ```
-*   **Google API Key**: Set your `GOOGLE_API_KEY` as an environment variable (e.g., in a `.env` file). This is required for Google Gemini embeddings and the Gemini LLM.
+*   **Google API Key**: If using Gemini, set your `GOOGLE_API_KEY` in the `.env` file.
 
 ### Installation
 
@@ -36,21 +33,24 @@ This project combines a Retrieval-Augmented Generation (RAG) system with the Mod
     git clone <your-repo-url>
     cd rag-mcp-app
     ```
-    *(Note: If you are following along with the development process, you would have already created this directory and copied files into it.)*
 
 2.  **Create and Activate a Virtual Environment:**
     ```bash
-    python -m venv venv
+    python -m venv .venv
     # On Windows:
-    .\venv\Scripts\activate
+    .\.venv\Scripts\activate
     # On macOS/Linux:
-    # source venv/bin/activate
+    source .venv/bin/activate
     ```
 
 3.  **Install Dependencies:**
     ```bash
     uv pip install -r requirements.txt
     ```
+
+4.  **Configure the Application:**
+    - Copy the example environment file: `cp .env.example .env`
+    - Edit the `.env` file to set your desired configuration (e.g., models, ports, API keys).
 
 ### Data Preparation
 
@@ -63,29 +63,25 @@ This project combines a Retrieval-Augmented Generation (RAG) system with the Mod
 
 ### Running the Application
 
-You will need to run two processes: the MCP server and the client UI.
+Activate your virtual environment in your terminal. The client application is designed to start the MCP server as a background process, so you only need to run one command:
 
-**1. Start the MCP Server:**
-
-Open a new terminal, activate your virtual environment, and run:
 ```bash
-python rag_server.py --llm-provider ollama
-# Or to use Gemini for RAG LLM:
-# python rag_server.py --llm-provider gemini
+uv run python client_ui.py --mcp-server rag_server.py
 ```
-This will start the MCP server, making the `get_weather` and `get_rag_response` tools available.
 
-**2. Start the Client UI:**
-
-Open another terminal, activate your virtual environment, and run:
-```bash
-python client_ui.py --mcp-server rag_server.py --model qwen3:1.7b
-```
-This command connects the client UI to the MCP server and specifies the orchestrator LLM.
-
-The client UI will launch in your browser. You can then interact with the chatbot, asking questions that might trigger the RAG system or the weather tool.
+The client will:
+1.  Start the `rag_server.py` script.
+2.  Connect to the server.
+3.  Launch the Gradio UI, which will be accessible at the port specified in your `.env` file (e.g., `http://127.0.0.1:3000`).
 
 ### Example Usage
 
 *   **Ask a question about your documents:** "What is the main topic of the documents?"
 *   **Ask about the weather:** "What's the weather like in London?"
+
+## To Do
+- remove RAG LLM. Redundant and accidental.
+- Make Chroma Vector DB a resource
+- Make access to embedding model and Vector DB a tool, when lacks current knowledge
+- Review Architecture, Code
+- Consider adding web search after that

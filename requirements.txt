@@ -144,3 +144,5 @@ rich>=14.0.0
 langchain-community # For Ollama embeddings
 google-generativeai # For Google Gemini embeddings
 langchain-google-genai # For Google Gemini integration
+pytest
+pytest-asyncio

@@ -25,12 +25,15 @@ import os
 load_dotenv()
 
 # Configuration for RAG
-DATA_PATH = r"data" # Assuming data directory will be in the same root as rag_server.py
-CHROMA_PATH = r"chroma_db" # Directory to store the ChromaDB
+DATA_PATH = os.environ.get("DATA_PATH", "data")
+CHROMA_PATH = os.environ.get("CHROMA_PATH", "chroma_db")
+EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "models/embedding-001")
+RAG_LLM_MODEL = os.environ.get("RAG_LLM_MODEL", "qwen3:1.7b")
+RETRIEVER_NUM_RESULTS = int(os.environ.get("RETRIEVER_NUM_RESULTS", 5))
 
 # Initialize embeddings model using Google Generative AI
 # Ensure your GOOGLE_API_KEY is set in your .env file
-embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+embeddings_model = GoogleGenerativeAIEmbeddings(model=EMBEDDINGS_MODEL)
 
 # Initialize the vector store
 # Ensure the chroma_db directory is created and populated by ingest.py before running the server.
@@ -43,8 +46,7 @@ vector_store = Chroma(
 )
 
 # Set up the retriever
-num_results = 5
-retriever = vector_store.as_retriever(search_kwargs={'k': num_results})
+retriever = vector_store.as_retriever(search_kwargs={'k': RETRIEVER_NUM_RESULTS})
 
 # Initialize FastMCP server
 # The name "rag-weather-server" is used for identifying the server.
@@ -123,26 +125,23 @@ async def get_rag_response(query: str, history: List[Dict[str, str]]) -> str:
     answer = await rag_chain.ainvoke(query)
     return answer
 
-# Main function to parse arguments and run the server
-async def main():
+# Main function to parse arguments and set up LLM
+if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--llm-provider", default="ollama", choices=["ollama", "gemini"],
+    p.add_argument("--llm-provider", default=os.environ.get("RAG_LLM_PROVIDER", "ollama"), choices=["ollama", "gemini"],
                    help="Choose the LLM provider for RAG: 'ollama' (default) or 'gemini'.")
     args = p.parse_args()
 
-    global rag_llm
+    # Initialize rag_llm based on the chosen provider
     if args.llm_provider == "gemini":
         rag_llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.5)
         print("Using Google Gemini for RAG LLM.")
     else: # Default to ollama
-        rag_llm = Ollama(model="qwen3:1.7b", temperature=0.5)
-        print("Using Ollama (qwen3:1.7b) for RAG LLM.")
+        rag_llm = Ollama(model=RAG_LLM_MODEL, temperature=0.5)
+        print(f"Using Ollama ({RAG_LLM_MODEL}) for RAG LLM.")
 
-    # Initialize and run the server.
+    # Run the MCP server
     # 'transport='stdio'' means the server will communicate via standard input/output,
     # which is how the MCP client connects to it.
     # FastMCP handles running async tools when the tool function is defined as async.
     mcp_server.run(transport='stdio')
-
-if __name__ == "__main__":
-    asyncio.run(main())
