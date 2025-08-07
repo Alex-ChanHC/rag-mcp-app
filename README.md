@@ -1,46 +1,47 @@
 # RAG MCP Application
 
-This project combines a Retrieval-Augmented Generation (RAG) system with the Model Context Protocol (MCP) to create a powerful, modular AI application. It features a dedicated MCP server (`rag_server.py`) that exposes RAG capabilities and a weather tool, and a client UI (`client_ui.py`) that uses an orchestrator LLM to interact with these tools.
+This project demonstrates a powerful, modular AI application using the Model Context Protocol (MCP). The architecture follows a clean agent-tool-resource model: a central orchestrator LLM acts as the agent, consuming tools provided by a lean MCP server to access various resources.
+
+The core components are:
+-   **`client_ui.py`**: A Gradio-based client that houses the single orchestrator LLM. This agent is responsible for all reasoning, including deciding when to use tools and generating final responses based on tool outputs.
+-   **`rag_server.py`**: A lightweight MCP server that provides tools to access resources. It does not contain any LLM. The available tools are:
+    -   `search_knowledge_base`: Accesses a ChromaDB vector database (the resource) to retrieve relevant information.
+    -   `get_weather`: Accesses an external weather API (the resource).
+
+This separation of concerns makes the system highly modular and easy to extend.
 
 ## Project Structure
 
-- `rag-mcp-app/`
-    - `data/`: Directory for your PDF documents to be indexed by the RAG system.
-    - `chroma_db/`: Directory where the ChromaDB vector store will be persisted.
-    - `rag_server.py`: The MCP server that hosts the RAG and weather tools.
-    - `client_ui.py`: The client application with a Gradio UI that orchestrates LLM calls and tool usage.
-    - `ingest.py`: A script to load and index your PDF documents into the vector database.
-    - `.env.example`: An example configuration file. Copy this to `.env` to configure the application.
-    - `requirements.txt`: Lists all project dependencies.
-    - `README.md`: This file.
+-   `rag-mcp-app/`
+    -   `data/`: Directory for your PDF documents to be indexed.
+    -   `chroma_db/`: Directory where the ChromaDB vector store is persisted.
+    -   `rag_server.py`: The MCP server that provides tools.
+    -   `client_ui.py`: The client application with the orchestrator LLM and Gradio UI.
+    -   `ingest.py`: Script to index PDF documents into the vector database.
+    -   `.env`: Your local configuration file.
+    -   `requirements.txt`: Project dependencies.
 
 ## Getting Started
 
 ### Prerequisites
 
-*   **Python 3.11+**: Ensure you have Python installed.
+*   **Python 3.13+**: Ensure you have a compatible Python version installed.
 *   **Ollama**: Install Ollama from [ollama.ai](https://ollama.ai/) and ensure it's running.
-*   **Ollama Models**: Pull the necessary models for the client's orchestrator LLM and the RAG LLM (if using Ollama). The defaults are `qwen3:1.7b`.
+*   **Ollama Model**: Pull the model for the orchestrator LLM. The default is `qwen3:1.7b`.
     ```bash
     ollama pull qwen3:1.7b
     ```
-*   **Google API Key**: If using Gemini, set your `GOOGLE_API_KEY` in the `.env` file.
+*   **Google API Key**: For document embeddings, set your `GOOGLE_API_KEY` in the `.env` file.
 
 ### Installation
 
-1.  **Clone the repository (if you haven't already):**
-    ```bash
-    git clone <your-repo-url>
-    cd rag-mcp-app
-    ```
+1.  **Clone the repository and navigate into it.**
 
 2.  **Create and Activate a Virtual Environment:**
     ```bash
     python -m venv .venv
-    # On Windows:
-    .\.venv\Scripts\activate
-    # On macOS/Linux:
-    source .venv/bin/activate
+    # On Windows: .\.venv\Scripts\activate
+    # On macOS/Linux: source .venv/bin/activate
     ```
 
 3.  **Install Dependencies:**
@@ -49,39 +50,41 @@ This project combines a Retrieval-Augmented Generation (RAG) system with the Mod
     ```
 
 4.  **Configure the Application:**
-    - Copy the example environment file: `cp .env.example .env`
-    - Edit the `.env` file to set your desired configuration (e.g., models, ports, API keys).
+    -   Copy the example environment file: `cp .env.example .env`
+    -   Edit the `.env` file to set your `GOOGLE_API_KEY` and any other desired configurations (e.g., model, port).
 
 ### Data Preparation
 
 1.  **Populate the `data/` directory**: Place your PDF documents into the `rag-mcp-app/data/` directory.
 
-2.  **Run the Ingestion Script**: This needs to be run *before* you start the RAG server for the first time, or whenever you add new documents to the `data/` directory.
+2.  **Run the Ingestion Script**: This must be run before starting the application for the first time, or whenever you update the documents.
     ```bash
-    python ingest.py
+    uv run python ingest.py
     ```
 
 ### Running the Application
 
-Activate your virtual environment in your terminal. The client application is designed to start the MCP server as a background process, so you only need to run one command:
+Activate your virtual environment. The client application starts the MCP server as a background process, so you only need to run one command:
 
 ```bash
+cd rag-mcp-app; .\.venv\Scripts\activate; uv run python client_ui.py --mcp-server rag_server.py
+  
 uv run python client_ui.py --mcp-server rag_server.py
 ```
 
-The client will:
-1.  Start the `rag_server.py` script.
-2.  Connect to the server.
-3.  Launch the Gradio UI, which will be accessible at the port specified in your `.env` file (e.g., `http://127.0.0.1:3000`).
+The client will start the server, connect to it, and launch the Gradio UI. Access it in your browser at the configured port (e.g., `http://127.0.0.1:3000`).
 
 ### Example Usage
 
 *   **Ask a question about your documents:** "What is the main topic of the documents?"
 *   **Ask about the weather:** "What's the weather like in London?"
 
-## To Do
-- remove RAG LLM. Redundant and accidental.
-- Make Chroma Vector DB a resource
-- Make access to embedding model and Vector DB a tool, when lacks current knowledge
-- Review Architecture, Code
-- Consider adding web search after that
+## Project Status
+
+The initial refactoring is complete. The architecture now correctly implements the agent-tool-resource model.
+
+-   [x] **Review Architecture, Code**: The architecture has been reviewed and refactored for clarity and modularity.
+-   [x] **Remove RAG LLM**: The redundant LLM has been removed from the server.
+-   [x] **Make Chroma Vector DB a resource**: The vector DB is now treated as a resource, accessed via a dedicated tool.
+-   [x] **Make access to Vector DB a tool**: The `search_knowledge_base` tool provides this functionality.
+-   [ ] **Consider adding web search**: The new architecture makes this easy. A new tool can be added to `rag_server.py` to enable web search capabilities.

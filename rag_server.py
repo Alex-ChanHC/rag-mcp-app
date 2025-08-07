@@ -3,21 +3,11 @@ import argparse
 import asyncio
 import urllib
 from contextlib import AsyncExitStack
-import ollama
-from ollama import ChatResponse
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 from mcp.server.fastmcp import FastMCP
-from rich.console import Console
-from rich.markdown import Markdown
-from typing import Optional, List, Dict, Any
+from typing import List, Dict
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_community.llms import Ollama # Import Ollama for local models
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 import os
 
@@ -28,7 +18,6 @@ load_dotenv()
 DATA_PATH = os.environ.get("DATA_PATH", "data")
 CHROMA_PATH = os.environ.get("CHROMA_PATH", "chroma_db")
 EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "models/embedding-001")
-RAG_LLM_MODEL = os.environ.get("RAG_LLM_MODEL", "qwen3:1.7b")
 RETRIEVER_NUM_RESULTS = int(os.environ.get("RETRIEVER_NUM_RESULTS", 5))
 
 # Initialize embeddings model using Google Generative AI
@@ -73,75 +62,37 @@ def get_weather(city: str) -> str:
     # Decode the response from bytes to a UTF-8 string and return it.
     return contents.decode('utf-8')
 
-# Register the 'get_rag_response' tool
+# Register the 'search_knowledge_base' tool
 @mcp_server.tool()
-async def get_rag_response(query: str, history: List[Dict[str, str]]) -> str:
+async def search_knowledge_base(query: str) -> str:
     """
-    Answers questions based on provided knowledge using RAG.
+    Searches the knowledge base for information relevant to the query.
 
-    This tool retrieves relevant information from a vector database and uses
-    an LLM (Gemini or Ollama) to generate an answer based solely on that information.
+    This tool retrieves relevant text chunks from the Chroma vector database
+    based on the user's query.
 
     Args:
-        query (str): The user's question.
-        history (List[Dict[str, str]]): The conversation history.
+        query (str): The user's question or search term.
 
     Returns:
-        str: The LLM's answer.
+        str: A string containing the concatenated content of the retrieved documents,
+             to be used as context for the orchestrator LLM.
     """
-    # Retrieve relevant chunks based on the question asked
-    # Use async invoke if available and the tool is async
+    print(f"Searching knowledge base for: '{query}'")
+    # Retrieve relevant chunks
     docs = await retriever.ainvoke(query)
 
-    # Add all the chunks to 'knowledge'
+    # Concatenate the content of the retrieved documents
     knowledge = ""
     for doc in docs:
         knowledge += doc.page_content + "\n\n"
+    
+    print(f"Found knowledge: {knowledge[:200]}...") # Log snippet of the knowledge
+    return knowledge
 
-    # Construct the RAG prompt
-    rag_prompt_template = ChatPromptTemplate.from_messages([
-        ("system", """You are an assistant which answers questions based on knowledge which is provided to you.
-        While answering, you don't use your internal knowledge,
-        but solely the information in the "The knowledge" section.
-        You don't mention anything to the user about the provided knowledge.
-        """),
-        ("user", """The question: {question}
-
-        Conversation history: {history}
-
-        The knowledge: {knowledge}
-        """)
-    ])
-
-    # Create the RAG chain
-    rag_chain = (
-        {"question": RunnablePassthrough(), "history": lambda _: history, "knowledge": lambda _: knowledge}
-        | rag_prompt_template
-        | rag_llm
-        | StrOutputParser()
-    )
-
-    # Execute the chain and return the answer
-    answer = await rag_chain.ainvoke(query)
-    return answer
-
-# Main function to parse arguments and set up LLM
+# Main function to run the server
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    p.add_argument("--llm-provider", default=os.environ.get("RAG_LLM_PROVIDER", "ollama"), choices=["ollama", "gemini"],
-                   help="Choose the LLM provider for RAG: 'ollama' (default) or 'gemini'.")
-    args = p.parse_args()
-
-    # Initialize rag_llm based on the chosen provider
-    if args.llm_provider == "gemini":
-        rag_llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.5)
-        print("Using Google Gemini for RAG LLM.")
-    else: # Default to ollama
-        rag_llm = Ollama(model=RAG_LLM_MODEL, temperature=0.5)
-        print(f"Using Ollama ({RAG_LLM_MODEL}) for RAG LLM.")
-
-    # Run the MCP server
+    print("Starting RAG MCP server...")
     # 'transport='stdio'' means the server will communicate via standard input/output,
     # which is how the MCP client connects to it.
-    # FastMCP handles running async tools when the tool function is defined as async.
     mcp_server.run(transport='stdio')
